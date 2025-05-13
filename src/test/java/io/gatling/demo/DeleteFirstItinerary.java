@@ -153,8 +153,9 @@ public class DeleteFirstItinerary extends Simulation {
                                     http("itinerary_2")
                                             .get("/cgi-bin/itinerary.pl")
                                             .headers(headers_2)
-                                            .check(regex("name=\"flightID\" value=\"(.+?)\"").findAll().saveAs("flightIDs"))
-                                            .check(regex("A total of (\\d+) scheduled flights").saveAs("flightCount"))
+                                            .check(substring("No flights have been reserved").count().saveAs("noFlightsCount"))
+                                            .check(regex("name=\"flightID\" value=\"(.+?)\"").findAll().optional().saveAs("flightIDs"))
+                                            .check(regex("A total of (\\d+) scheduled flights").optional().saveAs("flightCount"))
                                             .check(bodyString().saveAs("responseBodyFrom13")),
                                     http("itinerary_3")
                                             .get("/WebTours/images/in_itinerary.gif")
@@ -180,9 +181,17 @@ public class DeleteFirstItinerary extends Simulation {
     public static final ChainBuilder deleteTickets = exec(
             group("DeleteTickets").on(
                     exec(session -> {
-                        String boundary = "WebKitFormBoundary" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
                         List<String> flightIDs = session.get("flightIDs");
-                        int flightCount = Integer.parseInt(session.getString("flightCount"));
+                        String flightCountStr = session.getString("flightCount");
+
+                        // Проверяем, что flightIDs и flightCount не null
+                        if (flightIDs == null || flightIDs.isEmpty() || flightCountStr == null) {
+                            System.err.println("ERROR: No flights to delete. flightIDs or flightCount is null.");
+                            return session.markAsFailed();
+                        }
+
+                        String boundary = "WebKitFormBoundary" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+                        int flightCount = Integer.parseInt(flightCountStr);
 
                         StringBuilder requestBody = new StringBuilder();
 
@@ -218,15 +227,15 @@ public class DeleteFirstItinerary extends Simulation {
 
                         return session.set("dynamicBody", requestBody.toString())
                                 .set("boundary", boundary)
-                                .set("deletedFlightID", flightIDs.get(0)); // Сохраняем удаляемый flightID
+                                .set("deletedFlightID", flightIDs.get(0));
                     }),
                     http("delete_tickets_0")
                             .post("/cgi-bin/itinerary.pl")
                             .headers(headers_8)
                             .body(StringBody("#{dynamicBody}"))
                             .check(substring("Itinerary"))
-                            .check(regex("name=\"flightID\" value=\"(.+?)\"").findAll().saveAs("remainingFlightIDs"))
-                            .check(regex("A total of (\\d+) scheduled flights").saveAs("newFlightCount"))
+                            .check(regex("name=\"flightID\" value=\"(.+?)\"").findAll().optional().saveAs("remainingFlightIDs"))
+                            .check(regex("A total of (\\d+) scheduled flights").optional().saveAs("newFlightCount"))
                             .check(bodyString().saveAs("responseBodyFrom18"))
                             .resources(
                                     http("delete_tickets_1")
@@ -238,6 +247,46 @@ public class DeleteFirstItinerary extends Simulation {
                                             .headers(headers_7)
                                             .check(bodyBytes().saveAs("responseBodyFrom17"))
                             )
+            )
+    );
+
+    // Проверка количества билетов
+    private static final ChainBuilder verifyTicketCount = exec(
+            group("VerifyTicketCount").on(
+                    exec(session -> {
+                        String flightCountStr = session.getString("flightCount");
+                        String newFlightCountStr = session.getString("newFlightCount");
+
+                        // Проверяем flightCount
+                        if (flightCountStr == null) {
+                            System.err.println("ERROR: Cannot verify ticket count. flightCount is null.");
+                            return session.markAsFailed();
+                        }
+
+                        int flightCount = Integer.parseInt(flightCountStr);
+                        int newFlightCount = 0; // По умолчанию 0, если билетов больше нет
+
+                        // Если newFlightCountStr не null, парсим его
+                        if (newFlightCountStr != null) {
+                            newFlightCount = Integer.parseInt(newFlightCountStr);
+                        } else {
+                            System.out.println("INFO: No flights remain after deletion. Treating newFlightCount as 0.");
+                        }
+
+                        int expectedNewCount = flightCount - 1;
+
+                        System.out.println("Flight Count before deletion: " + flightCount);
+                        System.out.println("Flight Count after deletion: " + newFlightCount);
+                        System.out.println("Expected Flight Count after deletion: " + expectedNewCount);
+
+                        if (newFlightCount != expectedNewCount) {
+                            System.err.println("ERROR: Flight count did not decrease as expected! Expected: " + expectedNewCount + ", but got: " + newFlightCount);
+                            return session.markAsFailed();
+                        }
+
+                        System.out.println("Flight count verification passed.");
+                        return session;
+                    })
             )
     );
 
@@ -304,7 +353,10 @@ public class DeleteFirstItinerary extends Simulation {
             .pause(5)
             .exec(itinerary)
             .pause(5)
-            .exec(deleteTickets)
+            .doIf(session -> session.getInt("noFlightsCount") == 0).then(
+                    exec(deleteTickets)
+                    .exec(verifyTicketCount)
+            )
             .pause(5)
             .exec(logout)
             .exec(debugOutput);

@@ -191,11 +191,11 @@ public class LoginFirst extends Simulation {
     private ScenarioBuilder scn = scenario("UC_Login")
             .feed(csvFeeder)
             .exec(openSite)
-            .pause(46)
+            .pause(3)
             .exec(login)
-            .pause(15)
+            .pause(3)
             .exec(itinerary)
-            .pause(5)
+            .pause(3)
             .exec(logout);
 
     {
