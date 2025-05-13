@@ -1,18 +1,31 @@
-Gatling plugin for Maven - Java demo project
-============================================
+# Gatling Maven Plugin - Демо проект на Java
+---
 
-A simple showcase of a Maven project using the Gatling plugin for Maven. Refer to the plugin documentation
-[on the Gatling website](https://docs.gatling.io/reference/integrations/build-tools/maven-plugin/) for usage.
+Демонстрационный проект нагрузочного тестирования с использованием Gatling Maven Plugin.
 
-This project is written in Java, others are available for [Kotlin](https://github.com/gatling/gatling-maven-plugin-demo-kotlin)
-and [Scala](https://github.com/gatling/gatling-maven-plugin-demo-scala).
+## Основные функциональные скрипты
 
-It includes:
+- **Регистрация пользователей**
+- **Авторизация**
+- **Покупка билетов**
+- **Удаление билетов**
 
-* [Maven Wrapper](https://maven.apache.org/wrapper/), so that you can immediately run Maven with `./mvnw` without having
-  to install it on your computer
-* minimal `pom.xml`
-* latest version of `io.gatling:gatling-maven-plugin` applied
-* sample [Simulation](https://docs.gatling.io/reference/glossary/#simulation) class,
-  demonstrating sufficient Gatling functionality
-* proper source file layout
+## Тесты
+
+1. **Отладочный тест** - проверка корректности работы сценариев
+2. **Поиск максимальной производительности** - определение пределов системы
+3. **Подтверждение максимальной производительности** - верификация результатов
+4. **Поиск пиковой нагрузки** - определение точки деградации
+5. **Стресс-тест пиковой производительности**:
+   - Нагрузка до уровня деградации
+   - Проверка восстановления системы
+6. **Объемное тестирование**. Начальные условия:
+   - 50 виртуальных пользователей
+   - По 167 билетов у каждого
+
+## Быстрый старт
+
+```bash
+# Запуск меню выбора тестов
+./mvnw gatling:test
+```
